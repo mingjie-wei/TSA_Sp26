@@ -1,0 +1,226 @@
+---
+title: "ENV 797 - Time Series Analysis for Energy and Environment Applications | Spring 2026"
+subtitle: "Assignment 6 - Due date 02/27/26"
+author: "Mingjie Wei"
+output: pdf_document
+geometry: margin=2.54cm
+---
+
+## Directions
+
+You should open the .rmd file corresponding to this assignment on RStudio. The file is available on our class repository on Github.
+
+Once you have the file open on your local machine the first thing you will do is rename the file such that it includes your first and last name (e.g., "LuanaLima_TSA_A06_Sp26.Rmd"). Then change "Student Name" on line 4 with your name.
+
+Then you will start working through the assignment by **creating code and output** that answer each question. Be sure to use this assignment document. Your report should contain the answer to each question and any plots/tables you obtained (when applicable).
+
+When you have completed the assignment, **Knit** the text and code into a single PDF file. Submit this pdf using Sakai.
+
+R packages needed for this assignment: "ggplot2", "forecast", "tseries" and "sarima". Install these packages, if you haven't done yet. Do not forget to load them before running your script, since they are NOT default packages.
+
+```{r,warning=FALSE}
+#Load/install required package here
+library(ggplot2)
+library(forecast)
+library(tseries)
+library(sarima)
+library(cowplot)
+```
+
+This assignment has general questions about ARIMA Models.
+
+## Q1
+
+Describe the important characteristics of the sample autocorrelation function (ACF) plot and the partial sample autocorrelation function (PACF) plot for the following models:
+
+-   AR(2)
+
+> Answer: For an Autoregressive model of order 2:
+>
+> -   ACF: Tails off. It will gradually decay towards zero, either exponentially or following a damped sine wave pattern.
+>
+> -   PACF: Cuts off after lag $p=2$. We will see significant spikes at lag 1 and lag 2, and then the PACF will drop to zero (i.e., become statistically insignificant) for all subsequent lags.
+
+-   MA(1)
+
+> Answer: For a Moving Average model of order 1:
+>
+> -   ACF: Cuts off after lag $q=1$. We will see a single significant spike at lag 1, and then the ACF drops to zero for all subsequent lags.
+>
+> -   PACF: Tails off. It will gradually decay towards zero, either exponentially or with a damped sine wave pattern.
+
+## Q2
+
+Recall that the non-seasonal ARIMA is described by three parameters ARIMA$(p,d,q)$ where $p$ is the order of the autoregressive component, $d$ is the number of times the series need to be differenced to obtain stationarity and $q$ is the order of the moving average component. If we don't need to difference the series, we don't need to specify the "I" part and we can use the short version, i.e., the ARMA$(p,q)$.
+
+(a) Consider three models: ARMA(1,0), ARMA(0,1) and ARMA(1,1) with parameters $\phi=0.6$ and $\theta= 0.9$. The $\phi$ refers to the AR coefficient and the $\theta$ refers to the MA coefficient. Use the `arima.sim()` function in R to generate $n=100$ observations from each of these three models. Then, using `autoplot()` plot the generated series in three separate graphs.
+
+```{r}
+# Set a seed
+set.seed(123)
+
+# Generate n=100 observations
+arma10_100 <- arima.sim(model = list(ar = 0.6), n = 100)
+arma01_100 <- arima.sim(model = list(ma = 0.9), n = 100)
+arma11_100 <- arima.sim(model = list(ar = 0.6, ma = 0.9), n = 100)
+
+# Plot the generated series
+p1 <- autoplot(arma10_100) + ggtitle("ARMA(1,0) n=100")
+p2 <- autoplot(arma01_100) + ggtitle("ARMA(0,1) n=100")
+p3 <- autoplot(arma11_100) + ggtitle("ARMA(1,1) n=100")
+plot_grid(p1, p2, p3, ncol = 1)
+```
+
+(b) Plot the sample ACF for each of these models in one window to facilitate comparison (Hint: use `cowplot::plot_grid()`).
+
+```{r}
+# Plot sample ACF
+acf1 <- ggAcf(arma10_100) + ggtitle("ACF: ARMA(1,0)")
+acf2 <- ggAcf(arma01_100) + ggtitle("ACF: ARMA(0,1)")
+acf3 <- ggAcf(arma11_100) + ggtitle("ACF: ARMA(1,1)")
+plot_grid(acf1, acf2, acf3, ncol = 1)
+```
+
+(c) Plot the sample PACF for each of these models in one window to facilitate comparison.
+
+```{r}
+# Plot sample PACF
+pacf1 <- ggPacf(arma10_100) + ggtitle("PACF: ARMA(1,0)")
+pacf2 <- ggPacf(arma01_100) + ggtitle("PACF: ARMA(0,1)")
+pacf3 <- ggPacf(arma11_100) + ggtitle("PACF: ARMA(1,1)")
+plot_grid(pacf1, pacf2, pacf3, ncol = 1)
+```
+
+(d) Look at the ACFs and PACFs. Imagine you had these plots for a data set and you were asked to identify the model, i.e., is it AR, MA or ARMA and the order of each component. Would you be able identify them correctly? Explain your answer.
+
+> Answer:
+>
+> Yes, based on these specific plots, we actually can identify the models correctly.
+>
+> -   Top row (ARMA 1,0): The ACF gradually tails off (decays), and the PACF drops off significantly (cuts off) after lag 1. This perfectly points to an AR(1) model.
+>
+> -   Middle row (ARMA 0,1): The ACF has one significant spike at lag 1 and then cuts off, while the PACF tails off (oscillating). This perfectly points to an MA(1) model.
+>
+> -   Bottom row (ARMA 1,1): Both the ACF and PACF show significant spikes that gradually tail off rather than abruptly cutting off after a specific lag. This indicates a mixed ARMA model.
+
+(e) Compare the PACF values R computed with the values you provided for the lag 1 correlation coefficient, i.e., does $\phi=0.6$ match what you see on PACF for ARMA(1,0), and ARMA(1,1)? Should they match?
+
+> Answer:
+>
+> Yes, looking at the PACF plot for the ARMA(1,0) model, the spike at lag 1 is right at 0.6, which perfectly matches the specified parameter $\phi=0.6$.
+> For the ARMA(1,1) model, the lag 1 PACF value is much higher (around 0.75). This is exactly what we expect: they should not match. In a mixed ARMA model, the PACF at lag 1 is influenced by both the autoregressive ($\phi$) and the moving average ($\theta$) components, so it will not equal $\phi$ alone.
+
+(f) Increase number of observations to $n=1000$ and repeat parts (b)-(e).
+
+```{r}
+# Generate n=1000 observations
+arma10_1000 <- arima.sim(model = list(ar = 0.6), n = 1000)
+arma01_1000 <- arima.sim(model = list(ma = 0.9), n = 1000)
+arma11_1000 <- arima.sim(model = list(ar = 0.6, ma = 0.9), n = 1000)
+
+# Plot the generated series
+p1 <- autoplot(arma10_1000) + ggtitle("ARMA(1,0) n=1000")
+p2 <- autoplot(arma01_1000) + ggtitle("ARMA(0,1) n=1000")
+p3 <- autoplot(arma11_1000) + ggtitle("ARMA(1,1) n=1000")
+plot_grid(p1, p2, p3, ncol = 1)
+
+# Plot sample ACF
+acf1 <- ggAcf(arma10_1000) + ggtitle("ACF: ARMA(1,0)")
+acf2 <- ggAcf(arma01_1000) + ggtitle("ACF: ARMA(0,1)")
+acf3 <- ggAcf(arma11_1000) + ggtitle("ACF: ARMA(1,1)")
+plot_grid(acf1, acf2, acf3, ncol = 1)
+
+# Plot sample PACF
+pacf1 <- ggPacf(arma10_1000) + ggtitle("PACF: ARMA(1,0)")
+pacf2 <- ggPacf(arma01_1000) + ggtitle("PACF: ARMA(0,1)")
+pacf3 <- ggPacf(arma11_1000) + ggtitle("PACF: ARMA(1,1)")
+plot_grid(pacf1, pacf2, pacf3, ncol = 1)
+```
+
+> Answer:
+>
+> -   The "noise" is almost completely gone. The ARMA(0,1) ACF clearly cuts off precisely after lag 1, and the ARMA(1,0) PACF cuts off precisely after lag 1. All other lags fall neatly inside the blue lines.
+>
+> -   PACF Comparison: Look closely at the top PACF plot for ARMA(1,0). That first spike is sitting exactly at 0.6, matching our $\phi$ parameter perfectly.
+
+## Q3
+
+Consider the ARIMA model $y_t=0.7*y_{t-1}-0.25*y_{t-12}+a_t-0.1*a_{t-1}$
+
+(a) Identify the model using the notation ARIMA$(p,d,q)(P,D,Q)_ s$, i.e., identify the integers $p,d,q,P,D,Q,s$ (if possible) from the equation.
+
+    > Answer:
+    >
+    > The model is an $ARIMA(1,0,1)(1,0,0)_{12}$.
+    >
+    > -   $p = 1$: The equation includes $y_{t-1}$, which is a first-order non-seasonal Autoregressive (AR) term.
+    >
+    > -   $d = 0$: The equation models $y_t$ directly rather than a differenced series (like $y_t - y_{t-1}$), meaning no non-seasonal differencing was applied.
+    >
+    > -   $q = 1$: The equation includes $a_{t-1}$, which is a first-order non-seasonal Moving Average (MA) term.
+    >
+    > -   $P = 1$: The equation includes $y_{t-12}$, which is a first-order seasonal Autoregressive (SAR) term.
+    >
+    > -   $D = 0$: There is no seasonal differencing applied.
+    >
+    > -   $Q = 0$: There is no seasonal Moving Average term (which would look like $a_{t-12}$).
+    >
+    > -   $s = 12$: The seasonal lag is 12, as indicated by the $y_{t-12}$ term.
+
+(b) Also from the equation what are the values of the parameters, i.e., model coefficients.
+
+    > Answer:
+    >
+    > -   Non-seasonal AR coefficient ($\phi_1$): 0.7 (attached to $y_{t-1}$)
+    >
+    > -   Seasonal AR coefficient ($\Phi_1$): -0.25 (attached to $y_{t-12}$)
+    >
+    > -   Non-seasonal MA coefficient ($\theta_1$): -0.1 (attached to $a_{t-1}$)
+
+## Q4
+
+Simulate a seasonal ARIMA$(0, 1)\times(1, 0)_{12}$ model with $\phi =0 .8$ and $\theta = 0.5$ using the `sim_sarima()` function from package `sarima`. The $12$ after the bracket tells you that $s=12$, i.e., the seasonal lag is 12, suggesting monthly data whose behavior is repeated every 12 months. You can generate as many observations as you like. Note the Integrated part was omitted. It means the series do not need differencing, therefore $d=D=0$. Plot the generated series using `autoplot()`. Does it look seasonal?
+
+```{r}
+# For reproducibility
+set.seed(123)
+
+# Simulate 240 observations (e.g., 20 years of monthly data)
+sim_seasonal <- sim_sarima(n = 240, model = list(ma = 0.5, sar = 0.8, nseasons = 12))
+
+# Convert to a time series object with a frequency of 12 for better plotting
+sim_ts <- ts(sim_seasonal, frequency = 12)
+
+# Plot the generated series
+autoplot(sim_ts) + 
+  ggtitle("Simulated Seasonal ARIMA(0,0,1)(1,0,0)[12]") +
+  ylab("Value") + xlab("Time")
+```
+
+> Answer:
+>
+> Yes, the generated series looks highly seasonal. The plot displays a clear, regular, repeating wave-like pattern and consistent periodic fluctuations, which reflects the 12-month seasonal cycle we specified in the simulation.
+
+## Q5
+
+Plot ACF and PACF of the simulated series in Q4. Comment if the plots are well representing the model you simulated, i.e., would you be able to identify the order of both non-seasonal and seasonal components from the plots? Explain.
+
+```{r}
+p_acf_seas <- ggAcf(sim_ts, lag.max = 48) + ggtitle("ACF: Seasonal Model")
+p_pacf_seas <- ggPacf(sim_ts, lag.max = 48) + ggtitle("PACF: Seasonal Model")
+
+# Combine plots for comparison
+plot_grid(p_acf_seas, p_pacf_seas, ncol = 1)
+```
+
+> Answer:
+>
+> Yes, the plots represent the simulated model very well, and we can clearly identify the order of both the non-seasonal and seasonal components:
+>
+> -   Non-seasonal Component ($MA(1)$):
+>
+>     Looking at the early, non-seasonal lags (lags 1, 2, 3, etc.), the ACF has a single significant positive spike at lag 1 and then cuts off (drops inside the blue dashed lines). Meanwhile, the PACF shows a significant spike at lag 1 and then gradually tails off (with oscillating/decaying negative spikes at lags 2, 3, 4, etc.). This "ACF cut-off / PACF tail-off" pattern perfectly identifies a non-seasonal Moving Average model of order 1 ($q=1$).
+>
+> -   Seasonal Component ($SAR(1)$):
+>
+>     Looking at the seasonal lags (multiples of 12: lags 12, 24, 36, 48), the ACF shows significant, positive spikes that gradually decay (tail off) over time. In contrast, the PACF shows one highly significant spike exactly at lag 12, and then immediately cuts off (lags 24, 36, and 48 are all within the blue dashed confidence intervals). This "ACF tail-off / PACF cut-off" pattern at seasonal lags perfectly identifies a Seasonal Autoregressive model of order 1 ($P=1$).
